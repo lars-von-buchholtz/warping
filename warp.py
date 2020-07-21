@@ -1,30 +1,64 @@
 #!/usr/bin/env python
 
+#---------------------------------------------------------------
+# warping an image stack with coordinate points
+#
+# written by Lars v. Buchholtz (2020)
+#---------------------------------------------------------------
+
+
 # use as follows:
-# python warp.py --src=/Volumes/PASSLARS/analysis_ganglia/IV-2018-07-27-Tac1tagRFP/ --ref=/Volumes/PASSLARS/analysis_ganglia/IV-2018-07-27-Tac1tagRFP/IV20180727-tagRFP-brush-hairpull-pinch-airpuff-holding-airpuffwet-hot.tif --out=/Volumes/PASSLARS/analysis_ganglia/IV-2018-07-27-Tac1tagRFP/h1 --vec=/Volumes/PASSLARS/analysis_ganglia/IV-2018-07-27-Tac1tagRFP/h1-vectors.tsv
-# python warp.py --src=/Volumes/BLUEDISK/warping/IV-2018-08-24-Tac1tagRFP/h3-align1.tif --ref=/Volumes/BLUEDISK/warping/IV-2018-08-24-Tac1tagRFP/h1-outstack.tif --out=/Volumes/BLUEDISK/warping/IV-2018-08-24-Tac1tagRFP/h3 --vec=/Volumes/BLUEDISK/warping/IV-2018-08-24-Tac1tagRFP/h3-vectors.tsv
+# python warp.py --src=[SOURCE_FILENAME] --ref=[REFERENCE_FILENAME] --out=[BASENAME_FOR_OUTPUT] --vec=[VECTOR_FILENAME] --dir=[DIRECTORY]
+#
+
+
+# INPUT:
+#
+# SOURCE_FILENAME = image stack to be warped (alignment channel in first slice)
+#
+# REFERENCE_FILENAME = reference image stack that the source is being warped to (alignment channel in first slice)
+#
+# VECTOR_FILENAME = csv file with source X, source Y, target X, target Y coordintes as columns
+#
+# DIRECTORY = the directory that these 3 files are in and where the output is generated
+#
+# BASENAME_FOR_OUTPUT = arbritrary name that is appended by the specific output files
+
+# OUTPUT:
+#
+# BASENAME_FOR_OUTPUT-outstack.tif = warped stack from SOURCE_FILENAME
+# BASENAME_FOR_OUTPUT-input.tif = alignment channels overlaid before warping
+# BASENAME_FOR_OUTPUT-overlay.tif = alignment channels overlaid after warping
+# BASENAME_FOR_OUTPUT-arrows.svg = vector drawing of arrows connecting source and target coordinates (open in Illustrator or Inkscape)
+# BASENAME_FOR_OUTPUT-srctriangles.svg = vector drawing of Delaunay triangles of source coordinates
+# BASENAME_FOR_OUTPUT-reftriangles.svg = vector drawing of corresponding triangles of target coordinates
+
 
 import os
 import numpy as np
 import cv2
 import pandas as pd
 import skimage.io
-from matplotlib.patches import Ellipse, Rectangle, Polygon
-
-import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
+import matplotlib
+matplotlib.use("TkAgg")
+from matplotlib import pyplot as plt
+import argparse
 
 def readVectors(path) :
-    # Create an array of points.
+    # read vector .tsv file and return source and target points as coordinate tuples
+
     df = pd.read_csv(path,header=0,sep='\t')
     
     points1 = tuple(map(tuple,df.iloc[:,-4:-2].values.astype(np.int32)))
     points2 = tuple(map(tuple,df.iloc[:,-2:].values.astype(np.int32)))
 
-    
     return points1, points2
 
-# Check if a point is inside a rectangle
+
 def rectContains(rect, point) :
+	# Check if a point is inside a rectangle
+
     if point[0] < rect[0] :
         return False
     elif point[1] < rect[1] :
@@ -35,21 +69,26 @@ def rectContains(rect, point) :
         return False
     return True
 
-#calculate delanauy triangle
+
 def calculateDelaunayTriangles(rect, points):
+	#calculate delanauy triangles from coordinates and containing rectangle
+	# this function was taken from FaceMorph on LearnOpenCV
+
     #create subdiv
     subdiv = cv2.Subdiv2D(rect);
     
-    # Insert points into subdiv
+    # insert points into subdiv
     for p in points:
         subdiv.insert(p) 
     
+    # get triangles
     triangleList = subdiv.getTriangleList();
     
     delaunayTri = []
     
     pt = []    
-        
+    
+    # filter triangles
     for t in triangleList:        
         pt.append((t[0], t[1]))
         pt.append((t[2], t[3]))
@@ -61,12 +100,11 @@ def calculateDelaunayTriangles(rect, points):
         
         if rectContains(rect, pt1) and rectContains(rect, pt2) and rectContains(rect, pt3):
             ind = []
-            #Get face-points (from 68 face detector) by coordinates
             for j in range(0, 3):
                 for k in range(0, len(points)):                    
                     if(abs(pt[j][0] - points[k][0]) < 1.0 and abs(pt[j][1] - points[k][1]) < 1.0):
                         ind.append(k)    
-            # Three points form a triangle. Triangle array corresponds to the file tri.txt in FaceMorph 
+            # Three points that are within the containing rectangle form a triangle
             if len(ind) == 3:                                                
                 delaunayTri.append((ind[0], ind[1], ind[2]))
         
@@ -75,9 +113,11 @@ def calculateDelaunayTriangles(rect, points):
     
     return delaunayTri
 
-# Apply affine transform calculated using srcTri and dstTri to src and
-# output an image of size.
+
 def applyAffineTransform(src, srcTri, dstTri, size) :
+	# Apply affine transform calculated using a single source triangle srcTri 
+	# and a single destination triangle dstTri to src and
+# output an image of size.
     
     # Given a pair of triangles, find the affine transform.
     warpMat = cv2.getAffineTransform( np.float32(srcTri), np.float32(dstTri) )
@@ -94,17 +134,15 @@ def warpTriangle(src_img, warped_img, t1, t2) :
     # Find bounding rectangle for each triangle
     r1 = cv2.boundingRect(np.float32([t1]))
     r2 = cv2.boundingRect(np.float32([t2]))
-    #r = cv2.boundingRect(np.float32([t]))
 
 
     # Offset points by left top corner of the respective rectangles
     t1Rect = []
     t2Rect = []
-    #tRect = []
+
 
 
     for i in range(0, 3):
-        #tRect.append(((t[i][0] - r[0]),(t[i][1] - r[1])))
         t1Rect.append(((t1[i][0] - r1[0]),(t1[i][1] - r1[1])))
         t2Rect.append(((t2[i][0] - r2[0]),(t2[i][1] - r2[1])))
 
@@ -115,22 +153,17 @@ def warpTriangle(src_img, warped_img, t1, t2) :
 
     # Apply warpImage to small rectangular patches
     img1Rect = src_img[r1[1]:r1[1] + r1[3], r1[0]:r1[0] + r1[2]]
-    #img2Rect = img2[r2[1]:r2[1] + r2[3], r2[0]:r2[0] + r2[2]]
 
     size = (r2[2], r2[3])
     warpImage1 = applyAffineTransform(img1Rect, t1Rect, t2Rect, size)
-    #warpImage2 = applyAffineTransform(img2Rect, t2Rect, tRect, size)
-
-    # Alpha blend rectangular patches
-    #imgRect = (1.0 - alpha) * warpImage1 + alpha * warpImage2
 
     # Copy triangular region of the rectangular patch to the output image
-
     warped_img[r2[1]:r2[1]+r2[3], r2[0]:r2[0]+r2[2]] = warped_img[r2[1]:r2[1]+r2[3], r2[0]:r2[0]+r2[2]] * ( 1 - mask ) + warpImage1 * mask
     
 
 def warp_image(src_img,trgt_img,points_src,points_trgt):
-    # Rectangle to be used with Subdiv2D
+
+    # get Rectangle to be used with Subdiv2D
     size = trgt_img.shape
     rect = (0, 0, size[1], size[0])
     
@@ -154,11 +187,15 @@ def warp_image(src_img,trgt_img,points_src,points_trgt):
     return warped_img
     
 def draw_line(pt1,pt2,img_size):
+
     plt.plot([pt1[0], pt2[0]], [img_size[0] - pt1[1], img_size[0] - pt2[1]],color='black',linewidth=1)
 
 
 
 def draw_vectors(img_size ,points_src,points_trgt,out_name):
+	# function to generate a vector graphic svg file that shows the
+	# warping vectors as arrows
+
     img_ratio = img_size[1] / img_size[0]
     plt.figure(figsize=[img_ratio * 10,10])
     ax = plt.gca()
@@ -178,8 +215,7 @@ def draw_vectors(img_size ,points_src,points_trgt,out_name):
 
 
 def warp_stack(src_stack,ref_stack,points_src,points_ref):
-    
-    
+
     # Rectangle to be used with Subdiv2D
     size = ref_stack.shape[-2:]
 
@@ -188,13 +224,13 @@ def warp_stack(src_stack,ref_stack,points_src,points_ref):
     # make new image
     n_channels = src_stack.shape[0]
     
-    warped_stack = np.zeros((n_channels,) + ref_stack.shape[1:], dtype = ref_stack.dtype)
+    warped_stack = np.zeros((n_channels,) + ref_stack.shape[1:], dtype = src_stack.dtype)
 
     triangles = calculateDelaunayTriangles(rect, points_ref)
     
     for channel in range(n_channels):
         
-        warped_img = np.zeros(ref_stack.shape[1:], dtype = ref_stack.dtype)
+        warped_img = np.zeros(ref_stack.shape[1:], dtype = src_stack.dtype)
 
         for triangle in triangles:
 
@@ -214,51 +250,50 @@ def warp_stack(src_stack,ref_stack,points_src,points_ref):
         
     return warped_stack
 
-def rect_contains(rect, point) :
-    if point[0] < rect[0] :
-        return False
-    elif point[1] < rect[1] :
-        return False
-    elif point[0] > rect[2] :
-        return False
-    elif point[1] > rect[3] :
-        return False
-    return True
 
-def draw_delaunay(img_size, points,outname):
-    img_ratio = img_size[1] / img_size[0]
-    plt.figure(figsize=[img_ratio * 10,10])
+def draw_delaunay(img_size_src,img_size_ref, points_src, points_ref, outname1, outname2):
+    img_ratio = img_size_src[1] / img_size_src[0]
+    plt.figure(figsize=[img_ratio * 10, 10])
     ax = plt.gca()
-    ax.add_artist(Rectangle((0, 0), height=img_size[0], width=img_size[1],
+    ax.add_artist(Rectangle((0, 0), height=img_size_src[0], width=img_size_src[1],
                             fill=False))
 
-
     # Rectangle to be used with Subdiv2D
-    r = (0, 0, img_size[1], img_size[0])
-    
-    indices = calculateDelaunayTriangles(r, points)
-    
-    for t in indices :
-        
-        # draw triangle in ref image
-        pt1 = points[t[0]]
-        pt2 = points[t[1]]
-        pt3 = points[t[2]]
-        
-        draw_line(pt1,pt2,img_size)
-        draw_line(pt2,pt3,img_size)
-        draw_line(pt3,pt1,img_size)
+    r = (0, 0, img_size_src[1], img_size_src[0])
+
+    indices = calculateDelaunayTriangles(r, points_src)
+
+    for t in indices:
+        # draw triangle in src image
+        pt1 = points_src[t[0]]
+        pt2 = points_src[t[1]]
+        pt3 = points_src[t[2]]
+
+        draw_line(pt1, pt2, img_size_src)
+        draw_line(pt2, pt3, img_size_src)
+        draw_line(pt3, pt1, img_size_src)
 
     ax.axis('off')
-    plt.savefig(outname, transparent= True)
+    plt.savefig(outname1, transparent=True)
 
-def draw_arrows(img,src_points,ref_points,arrow_color):
-    
-    for i,pt1 in enumerate(src_points):
-        pt2 = ref_points[i]
-        cv2.arrowedLine(img, pt1, pt2, arrow_color, 2)
-        
-    return img
+    img_ratio = img_size_ref[1] / img_size_ref[0]
+    plt.figure(figsize=[img_ratio * 10, 10])
+    ax = plt.gca()
+    ax.add_artist(Rectangle((0, 0), height=img_size_ref[0], width=img_size_ref[1],
+                            fill=False))
+    for t in indices:
+        # draw triangle in src image
+        pt1 = points_ref[t[0]]
+        pt2 = points_ref[t[1]]
+        pt3 = points_ref[t[2]]
+
+        draw_line(pt1, pt2, img_size_ref)
+        draw_line(pt2, pt3, img_size_ref)
+        draw_line(pt3, pt1, img_size_ref)
+
+    ax.axis('off')
+    plt.savefig(outname2, transparent=True)
+
 
 def sort_stack(stack):
     if stack.ndim == 2:
@@ -267,8 +302,8 @@ def sort_stack(stack):
 
 
 if __name__ == '__main__' :    
+    # main function
     
-    import argparse
 
     # Parse command line arguments
     parser = argparse.ArgumentParser(
@@ -293,16 +328,15 @@ if __name__ == '__main__' :
     args = parser.parse_args()
 
 
-    ref_path = os.path.join(args.dir,args.ref) if hasattr(args,'dir') else args.ref
-    src_path = os.path.join(args.dir,args.src) if hasattr(args,'dir') else args.src
-    vec_path = os.path.join(args.dir,args.vec) if hasattr(args,'dir') else args.vec
-    out_path = os.path.join(args.dir,args.out) if hasattr(args,'dir') else args.out
-
+    ref_path = os.path.join(args.dir,args.ref) if args.dir is not None else args.ref
+    src_path = os.path.join(args.dir,args.src) if args.dir is not None else args.src
+    vec_path = os.path.join(args.dir,args.vec) if args.dir is not None else args.vec
+    out_path = os.path.join(args.dir,args.out) if args.dir is not None else args.out
 
     ref_stack = skimage.io.imread(ref_path)
     src_stack = skimage.io.imread(src_path)
-    
-    src_points,ref_points = readVectors(vec_path)
+
+    src_points, ref_points = readVectors(vec_path)
 
     # if one of the stacks is a single image turn it into a 1 x array
     if len(ref_stack.shape) == 2:
@@ -312,37 +346,39 @@ if __name__ == '__main__' :
 
     # imread returns different dimension orders for different number of channels/slices
     # so we put the smallest dimension first
-    src_stack = np.moveaxis(src_stack,np.argmin(src_stack.shape),0)
-    ref_stack = np.moveaxis(ref_stack,np.argmin(ref_stack.shape),0)
-    
+    src_stack = np.moveaxis(src_stack, np.argmin(src_stack.shape), 0)
+    ref_stack = np.moveaxis(ref_stack, np.argmin(ref_stack.shape), 0)
+
     # create main output: the warped src stack
-    warped_stack = warp_stack(src_stack,ref_stack,src_points,ref_points)
-    
+    warped_stack = warp_stack(src_stack, ref_stack, src_points, ref_points)
+
     # create input overlay rgb image
-    
-    arr_img = np.zeros(ref_stack.shape[1:] + (3,), dtype = ref_stack.dtype)
-    arr_img[:,:,1] = ref_stack[0,:,:]
-    arr_img[:,:,0] = src_stack[0,:,:]
+
+    arr_img = np.zeros(ref_stack.shape[1:] + (3,), dtype=np.uint8)
+
+    arr_img[:, :, 1] = ref_stack[0, :, :]/256 if ref_stack[0, :, :].max().max() > 255 else ref_stack[0, :, :]
+    arr_img[:, :, 0] = src_stack[0, :, :]/256 if src_stack[0, :, :].max().max() > 255 else src_stack[0, :, :]
 
     skimage.io.imsave(out_path + '-input.tif', arr_img)
 
     # create and vector arrow svg
 
-    draw_vectors(arr_img.shape,src_points,ref_points,out_path + '-arrows.svg')
+    draw_vectors(arr_img.shape, src_points, ref_points,
+                 out_path + '-arrows.svg')
 
     # create control overlay image
-    
-    over_img = np.zeros(ref_stack.shape[1:] + (3,), dtype = ref_stack.dtype)
-    over_img[:,:,1] = ref_stack[0,:,:]
-    over_img[:,:,0] = warped_stack[0,:,:]
+
+    over_img = np.zeros(ref_stack.shape[1:] + (3,), dtype=np.uint8)
+    over_img[:, :, 1] = ref_stack[0, :, :]/256 if ref_stack[0, :, :].max().max() > 255 else ref_stack[0, :, :]
+    over_img[:, :, 0] = warped_stack[0, :, :]/256 if warped_stack[0, :, :].max().max() > 255 else warped_stack[0, :, :]
+
     skimage.io.imsave(out_path + '-overlay.tif', over_img)
 
-    
-    #create and save ref and src triangle svg's
-    draw_delaunay(src_stack.shape[1:], src_points,out_path + '-srctriangles.svg')
-    draw_delaunay(ref_stack.shape[1:], ref_points,out_path + '-reftriangles.svg')
-    
 
+    # create and save ref and src triangle svg's
+    draw_delaunay(src_stack.shape[1:], ref_stack.shape[1:], src_points, \
+                  ref_points, out_path + '-srctriangles.svg', \
+                  out_path + '-reftriangles.svg')
 
-    #skimage.io.imsave(out_path + '-outstack.tif', warped_stack,plugin='tifffile',metadata={'axes': 'ZYX'})
-    skimage.external.tifffile.imsave(out_path + '-outstack.tif', warped_stack,imagej=True,metadata={'axes': 'YXZ'})
+    skimage.external.tifffile.imsave(out_path + '-outstack.tif', warped_stack,
+                                     imagej=True, metadata={'axes': 'YXZ'})
