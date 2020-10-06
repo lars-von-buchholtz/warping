@@ -1,0 +1,21 @@
+function [ROIname,small_image,ROI_small_coordinates,max_sm_image] = load_n_crop(filename,handles,size_leak,ROI_an)
+%% import data from GUI objects and external files
+movie=handles.text5.UserData;
+ROI_data=ROI_an;
+ROIrectangle=ROI_data.vnRectBounds;
+ROIname=ROI_data.strName;
+maxCells=handles.text6.UserData;
+%% set cropping boundaries
+image_center=[(ROIrectangle(2)+ROIrectangle(4))/2 (ROIrectangle(1)+ROIrectangle(3))/2];
+%field_size=(ROIrectangle(3)-ROIrectangle(1))*size_leak/2;
+crop_size=[image_center(1)-0.5*size_leak*maxCells(1) image_center(2)-0.5*size_leak*maxCells(2) maxCells(1)*size_leak maxCells(2)*size_leak];
+%% crop both movies and ROI to small size
+for i=1:size(movie,3)
+small_image(:,:,i)=imcrop(movie(:,:,i),round(crop_size));
+end
+max_sm_image=max(small_image,[],3);
+small_image(1:3,1:3,:)=max(max(max(small_image)));
+small_image(4:6,1:3,:)=min(min(min(small_image)));
+ROI_small_coordinates=[ROI_data.mnCoordinates(:,1)-round(crop_size(1)) ROI_data.mnCoordinates(:,2)-round(crop_size(2))]; 
+end
+
