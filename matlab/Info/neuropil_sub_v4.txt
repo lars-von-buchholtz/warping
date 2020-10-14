@@ -1,0 +1,6 @@
+Neuropil subtractor v4 10-21-19
+installation as usual, delete all previous versions, copy all files and add folder to path
+New in version 4:
+1) calculates area in pixel for every cell saved
+2) traces sorted in ascending order by cell size (in all output files)
+3) neuro_corr_traces_labelled.csv has an extra row with area for every cell 

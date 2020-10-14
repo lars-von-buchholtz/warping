@@ -5,7 +5,9 @@ Open FIJI ImageJ and install the `warpingvectors.ijm` macro.
 
 From the Plugins/Macros menu run the align_patch macro for a crude initial alignment of the stacks. As prompted use the multi-point tool to select 3 matching points on the reference stack and the source stack to crudely align the source stack to the reference stack.
 
+
 Work on the red/green overlay generated above to draw the warping vectors (from the source point to the target point).
+
 Before beginning, make sure the ROI manager and Results table are both empty.
 
 Activate the drawing tool by pressing the 'Record' icon (filled circle) in the toolbar.
@@ -96,9 +98,34 @@ docker-compose run -v [DIRECTORY]:[DIRECTORY] app python warp.py --src=[SOURCE_F
 
 # CALCIUM TRACE EXTRACTION AND BACKGROUND SUBTRACTION
 
-To extract dF/F fluorescence traces for a set of ImageJ ROIs from a stack of timeframes, subtract the surrounding background fluorescence and perform quality control, we are making available a Matlab script that was written by Marcin Szczot and has been first described [here](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6875774/).
+To extract dF/F fluorescence traces for a set of ImageJ ROIs from a stack of timeframes, subtract the surrounding background fluorescence and perform quality control, we are making available a Matlab script that was written by Marcin Szczot and has been first described [here](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5599122/).  
+It contains a read function  for large tiff files written by Darcy Peterka (dp2403@columbia.edu) and published in [Pnevmatikakis et al](https://www.ncbi.nlm.nih.gov/pmc/articles/pmid/26774160/)
+and requires the [geom2d library](https://www.mathworks.com/matlabcentral/fileexchange/7844-geom2d).  
+  
+### Installation:
 
-# ANALYSIS OF DATA for von Buchholtz et al. 2020
+1) Unpack the zip file into any folder you want.
+2) In matlab go to home->set path -> add with subfolders -> choose a folder to which you unpacked; choose 'save' at the bottom to not have to do this every time you start matlab. 
+
+### Operation  
+
+1) place a movie and all unpacked ROI files selected from ImageJ (unpacked from a zip file you get when saving ROI in imageJ)
+2) In matlab go to open-> find your directory and choose 'main_neuropil_sub.m'
+3) on the top go to editor tab and hit Run.
+4) in gui choose a folder where your data is stored and where you want to save output click let's get analyzing.
+5) after it sucesfully loads you should see gui with various controls, refer to screenshot I attached which describes what is what.
+6) after you gho through all the cells gui will close, in the output folder you will find screenshot for every cell and most importantly csv files where every column is a calcium trace for a cell. You can use that for data visualization.
+
+### Output  
+  
+   - neuro_corr_traces.csv has all the traces with the first column indicating frames
+   - neuro_corr_traces_labelled.csv has an extra 2 rows with area in pixel and imageJ ROI name for every cell.
+   - there are also matlab variables with a list of accepted ROI and rejected ROIs.
+ 
+
+
+# ANALYSIS OF DATA for von Buchholtz et al.
 
 A Jupyter notebook that performs much of the qualitative and quantitative analysis for the manuscript 
-is provided as part of this repo.
+is provided as part of this repo. A rendered HTML version of this notebook is also available.
+

@@ -1,0 +1,16 @@
+NeuropilSubstractor:
+Installation:
+1) Unpack the zip file into any folder you want
+2) In matlab go to home->set path -> add with subfolders -> choose a folder to which you unpacked choose 'save' at the bottom to not have to do this every time you start matlab
+to run 
+1) place a movie and all unpacked ROI files selected from ImageJ (unpacked from a zip file you get when saving ROI in imageJ)
+2) In matlab go to open-> find your directory and choose 'main_neuropil_sub.m'
+3) on the top go to editor tab and hit Run.
+4) in gui choose a folder where your data is stored and where you want to save output click let's get analyzing.
+5) after it sucesfully loads you should see gui with various controls, refer to screenshot I attached which describes what is what.
+6) after you gho through all the cells gui will close, in the output folder you will find screenshot for every cell and most importantly csv files where every column is a calcium trace for a cell. You can use that for data visualization.
+   neuro_corr_traces.csv has all the traces with the first column indicating frames
+   neuro_corr_traces_labelled.csv has an extra 2 rows with area in pixel and imageJ ROI name for every cell.
+   there are also matlab variables with a list of accepted ROI and rejected ROIs.
+ 
+					
