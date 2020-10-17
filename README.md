@@ -37,7 +37,7 @@ On Windows use the  Anaconda Prompt (you might have to run it as administrator) 
 
 ```bash
 conda create -n warping37  python=3.7 anaconda
-conda install -n warping pip
+conda install -n warping37 pip
 conda activate warping37
 pip install -r requirements.txt
 ```
