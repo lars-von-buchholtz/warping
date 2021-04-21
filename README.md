@@ -1,4 +1,7 @@
 
+This code for warping in situ to in vivo images accompanies the publication by [von Buchholtz et al.](https://www.cell.com/neuron/pdfExtended/S0896-6273(20)30852-7) in Neuron.
+
+
 # DRAW WARPING VECTORS
 
 Open FIJI ImageJ and install the `warpingvectors.ijm` macro.
@@ -126,6 +129,5 @@ and requires the [geom2d library](https://www.mathworks.com/matlabcentral/fileex
 
 # ANALYSIS OF DATA for von Buchholtz et al.
 
-A Jupyter notebook that performs much of the qualitative and quantitative analysis for the manuscript 
-is provided as part of this repo. A rendered HTML version of this notebook is also available.
+A Jupyter notebook that performs much of the qualitative and quantitative analysis for the manuscript published in [Neuron] (https://www.cell.com/neuron/pdfExtended/S0896-6273(20)30852-7) is provided as part of this repo. A rendered HTML version of this notebook is also available.
 
